@@ -21,6 +21,33 @@ def init_db():
         conn.commit()
 
 @app.route('/', methods=['GET'])
+def home():
+    return render_template('index.html')
+
+@app.route('/store_data', methods=['POST'])
+def store_data():
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        salt = data.get('salt')
+        system_info = data.get('system_info')
+
+        if not all([username, password, salt, system_info]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        with closing(sqlite3.connect('user_data.db')) as conn:
+            c = conn.cursor()
+            c.execute('INSERT INTO users (username, password, salt, system_info) VALUES (?, ?, ?, ?)', 
+                      (username, password, salt, json.dumps(system_info)))
+            conn.commit()
+
+        return jsonify({"message": "Data stored successfully"}), 200
+    except Exception as e:
+        app.logger.error(f"Error storing data: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/show_data', methods=['GET'])
 def show_data():
     page = int(request.args.get('page', 1))
     per_page = 12  # Number of records per page
@@ -45,32 +72,7 @@ def show_data():
             })
 
     total_pages = (total_users + per_page - 1) // per_page
-    return render_template('index.html', users=users, page=page, total_pages=total_pages)
-
-@app.route('/store_data', methods=['POST'])
-def store_data():
-    try:
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        salt = data.get('salt')
-        system_info = data.get('system_info')
-
-        if not all([username, password, salt, system_info]):
-            return jsonify({"error": "Missing required fields"}), 400
-
-        with closing(sqlite3.connect('user_data.db')) as conn:
-            c = conn.cursor()
-            c.execute('INSERT INTO users (username, password, salt, system_info) VALUES (?, ?, ?, ?)', 
-                      (username, password, salt, json.dumps(system_info)))
-            conn.commit()
-
-        return jsonify({"message": "Data stored successfully"}), 200
-    except Exception as e:
-        app.logger.error(f"Error storing data: {e}", exc_info=True)
-        return jsonify({"error": "Internal server error"}), 500
-
-
+    return render_template('show_data.html', users=users, page=page, total_pages=total_pages)
 
 @app.route('/search', methods=['GET'])
 def search():
